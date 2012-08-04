@@ -87,4 +87,26 @@ $ cat incr/2012-08-04_16-04-19/backup.chain
 
 The older if of course the order with which these full + incremental backups should be restored.
 
+To list the available backup chains you can run *xtrabackup.sh list*:
+
+``` bash
+$ backup/xtrabackup.sh list
+Loading configuration from /root/.xtrabackup.config.
+Available backup chains (from oldest to latest):
+
+Backup chain 1:
+        Full:        2012-08-04_15-54-23
+        Incremental: 2012-08-04_15-55-01
+        Incremental: 2012-08-04_15-56-44
+Backup chain 2:
+        Full:        2012-08-04_15-59-29
+        Incremental: 2012-08-04_16-02-42
+        Incremental: 2012-08-04_16-03-34
+        Incremental: 2012-08-04_16-04-19
+
+Latest backup available:
+        Incremental: 2012-08-04_16-04-19
+``` 
+
+
 **TODO**: support for automated restores. For the time being, please check [this blog post](http://vitobotta.com/painless-hot-backups-mysql-live-databases-percona-xtrabackup/ "Painless, ultra fast hot backups and restores of MySQL databases with Percona's XtraBackup") on restoring full backups, and [this page](http://www.percona.com/doc/percona-xtrabackup/xtrabackup_bin/incremental_backups.html?id=percona-xtrabackup:xtrabackup:incremental) on the Percona website on how to restore from incrementals.
