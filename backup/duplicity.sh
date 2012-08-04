@@ -56,7 +56,7 @@ if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 	echo -e "Running 'before' scripts...\n"
 	for SCRIPT in ${RUN_BEFORE[@]}; do
 		if [ -f $SCRIPT ]; then
-			$SCRIPT
+			$SCRIPT "$@"
 		else
 			echo "WARNING: before script $SCRIPT not found"
 		fi
@@ -91,7 +91,7 @@ if [ ${#RUN_AFTER[@]} -gt 0 ]; then
 	echo -e "Running 'after' scripts...\n"
 	for SCRIPT in ${RUN_AFTER[@]}; do
 		if [ -f $SCRIPT ]; then
-			$SCRIPT
+			$SCRIPT "$@"
 		else
 			echo "WARNING: before script $SCRIPT not found"
 		fi
