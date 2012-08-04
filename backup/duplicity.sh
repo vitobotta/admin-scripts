@@ -6,7 +6,7 @@ die () {
 }
 
 DUPLICITY=$(which duplicity)
-[ ! -f "$DUPLICITY" ] && die "Duplicity not found - please ensure it is installed before proceeding."
+[ -f "$DUPLICITY" ] || die "Duplicity not found - please ensure it is installed before proceeding."
 
 
 CONFIG_FILE=$HOME/.duplicity.config
@@ -52,7 +52,7 @@ INCLUDE="$(for s in ${BACKUP_SOURCE_DIRECTORIES[@]} ; do echo --include=$s; done
 DUPLICITY_SETTINGS="--verbosity=${VERBOSITY-warning} --archive=/tmp/duplicity --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE"
 DUPLICITY_COMMAND="$(which nice) -n 15 $IONICE_COMMAND duplicity $DUPLICITY_SETTINGS"
 
-if [ -n "$BACKUP_USER" ]; then
+if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 	echo -e "Running 'before' scripts...\n"
 	for SCRIPT in ${RUN_BEFORE[@]}; do
 		if [ -f $SCRIPT ]; then
@@ -75,7 +75,7 @@ ssh $BACKUP_USER@$BACKUP_HOST mkdir -vp $BACKUP_TARGET_DIRECTORY
   elif [ "$1" = "incr" ]; then
   	$DUPLICITY_COMMAND incr --full-if-older-than=$MAX_INCREMENTALS_AGE $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
   else
-    die "Periodicity not specified. Please run: as $0 [incr|full]"
+    die "Backup type not specified. Please run: as $0 [incr|full]"
   fi
 
 	$DUPLICITY_COMMAND remove-all-but-n-full $MAX_FULL_BACKUPS $TARGET --force
@@ -87,7 +87,7 @@ ssh $BACKUP_USER@$BACKUP_HOST mkdir -vp $BACKUP_TARGET_DIRECTORY
 	unset PASSPHRASE
 )
 
-if [ -n "$BACKUP_USER" ]; then
+if [ ${#RUN_AFTER[@]} -gt 0 ]; then
 	echo -e "Running 'after' scripts...\n"
 	for SCRIPT in ${RUN_AFTER[@]}; do
 		if [ -f $SCRIPT ]; then
