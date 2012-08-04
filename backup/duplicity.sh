@@ -37,12 +37,8 @@ EOF
 	die "Configuration has been initialised in $CONFIG_FILE. \nPlease make sure all settings are correctly defined/customised - aborting."
 fi
 
-(
-	[ -n "$BACKUP_USER" ] && \
-	[ -n "$BACKUP_HOST" ] && \
-	[ -n "$BACKUP_TARGET_DIRECTORY" ] && \
-	[ -n "$DUPLICITY_PASSPHRASE" ]
-) || die "Please ensure all the settings are defined in the configuration file ($HOME/.duplicity.config)."
+[ -n "$BACKUP_USER" -a -n "$BACKUP_USER" -a -n "$BACKUP_HOST" -a -n "$BACKUP_TARGET_DIRECTORY" -a -n "$DUPLICITY_PASSPHRASE" ] \
+	|| die "Please ensure all the settings are defined in the configuration file ($HOME/.duplicity.config)."
 
 IONICE=$(which ionice)
 
