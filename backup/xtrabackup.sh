@@ -88,12 +88,14 @@ elif [ "$1" = "list" ]; then
 			echo "Backup chain $COUNTER:"
 			echo -e "\tFull:        $FULL_BACKUP"
 
-			grep -l $FULL_BACKUP $INCREMENTALS_DIRECTORY/**/backup.chain | \
-			while read INCREMENTAL; 
-			do 
-				BACKUP_DATE=${INCREMENTAL%/backup.chain}
-				echo -e "\tIncremental: ${BACKUP_DATE##*/}"
-			done
+			if [[ $(ls $INCREMENTALS_DIRECTORY | wc -l) -gt 0 ]]; then
+				grep -l $FULL_BACKUP $INCREMENTALS_DIRECTORY/**/backup.chain | \
+				while read INCREMENTAL; 
+				do 
+					BACKUP_DATE=${INCREMENTAL%/backup.chain}
+					echo -e "\tIncremental: ${BACKUP_DATE##*/}"
+				done
+			fi
 		done
 		
 		LATEST_BACKUP=$(find $BACKUPS_DIRECTORY -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1)
