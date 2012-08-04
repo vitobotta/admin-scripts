@@ -65,7 +65,7 @@ incremental_backup () {
 if [ "$1" = "full" ]; then
 	full_backup
 elif [ "$1" = "incr" ]; then
-	LAST_CHECKPOINTS=$(find "$FULLS_DIRECTORY"/../ -mindepth 3 -maxdepth 3 -type f -name xtrabackup_checkpoints -exec ls -dt {} \+ | head -1)
+	LAST_CHECKPOINTS=$(find $BACKUPS_DIRECTORY -mindepth 3 -maxdepth 3 -type f -name xtrabackup_checkpoints -exec ls -dt {} \+ | head -1)
 	
 	if [[ -f $LAST_CHECKPOINTS ]]; then
 		incremental_backup
@@ -131,23 +131,42 @@ elif [ "$1" = "restore" ]; then
 			echo "Copying data files to destination..."
 			$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION
 			echo -e "...done.\n"
-
+			
 			echo "Preparing the destination for use with MySQL..."
 			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION
 			echo -e "...done.\n"
-			
-			echo << EOS
-				The destination is ready. All you need to do now is:
-					- ensure the MySQL user owns the destination directory, e.g.
-							chown -R mysql:mysql $DESTINATION
-					- stop MySQL server
-					- replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of $DESTINATION
-					- start MySQL server again
-EOS		
 
 		else
+			XTRABACKUP=$(which xtrabackup)
+			[ -f "$XTRABACKUP" ] || die "xtrabackup executable not found - this is required in order to restore from incrementals. Ensure xtrabackup is installed properly - aborting."
+			
+			FULL_BACKUP=$(cat $BACKUP/backup.chain | head -1)
+			
+			echo "- Restore of full backup from $FULL_BACKUP"
+
+			echo "Copying data files to destination..."
+			$RSYNC_COMMAND --quiet -ah --delete $FULL_BACKUP/ $DESTINATION
+			echo -e "...done.\n"
+
+			echo "Preparing the base backup in the destination..."
+			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION
+			$XTRABACKUP --prepare --apply-log-only --target-dir=$DESTINATION
+			echo -e "...done.\n"
+			
+			for INCREMENTAL in $(cat $BACKUP/backup.chain | tail -n +2); do
+				echo "Applying incremental from $INCREMENTAL...\n" 
+				$XTRABACKUP  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL
+				echo -e "...done.\n"
+			done
+			
 			echo "incrementals not ready..."
 		fi
+		
+		echo -e "The destination is ready. All you need to do now is:
+		- ensure the MySQL user owns the destination directory, e.g.: chown -R mysql:mysql $DESTINATION
+		- stop MySQL server
+		- replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of $DESTINATION
+		- start MySQL server again"
 	else
 		die "Backup not found. To see the list of the available backups, run: $0 list"
 	fi
