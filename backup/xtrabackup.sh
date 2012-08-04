@@ -5,6 +5,10 @@ die () {
 	exit 1
 }
 
+fail () {
+	die "...FAILED! See $LOG_FILE for details - aborting.\n"
+}
+
 INNOBACKUPEX=$(which innobackupex)
 [ -f "$INNOBACKUPEX" ] || die "innobackupex script not found - please ensure xtrabackup is installed before proceeding."
 
@@ -134,55 +138,49 @@ elif [ "$1" = "restore" ]; then
 		echo -e "!! About to restore MySQL backup taken on $BACKUP_TIMESTAMP to $DESTINATION !!\n"
 		
 		if [[ "$BACKUP" == *full* ]]; then
-			(
-				echo "- Restore of full backup taken on $BACKUP_TIMESTAMP"
+			echo "- Restore of full backup taken on $BACKUP_TIMESTAMP"
 
-				echo "Copying data files to destination..."
-				$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION &> $LOG_FILE
-				echo -e "...done.\n"
-			
-				echo "Preparing the destination for use with MySQL..."
-				$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION  &> $LOG_FILE
-				echo -e "...done.\n"
-			) || die "...FAILED! See $LOG_FILE for details - aborting."
-
+			echo "Copying data files to destination..."
+			$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION &> $LOG_FILE || fail
+			echo -e "...done.\n"
+		
+			echo "Preparing the destination for use with MySQL..."
+			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION  &> $LOG_FILE || fail
+			echo -e "...done.\n"
 		else
-			(
-				XTRABACKUP=$(which xtrabackup)
-				[ -f "$XTRABACKUP" ] || die "xtrabackup executable not found - this is required in order to restore from incrementals. Ensure xtrabackup is installed properly - aborting."
-			
-				FULL_BACKUP=$(cat $BACKUP/backup.chain | head -1)
-			
-				echo "- Restore of base backup from $FULL_BACKUP"
+			XTRABACKUP=$(which xtrabackup)
+			[ -f "$XTRABACKUP" ] || die "xtrabackup executable not found - this is required in order to restore from incrementals. Ensure xtrabackup is installed properly - aborting."
+		
+			FULL_BACKUP=$(cat $BACKUP/backup.chain | head -1)
+		
+			echo "- Restore of base backup from $FULL_BACKUP"
 
-				echo "Copying data files to destination..."
-				$RSYNC_COMMAND --quiet -ah --delete $FULL_BACKUP/ $DESTINATION  &> $LOG_FILE
+			echo "Copying data files to destination..."
+			$RSYNC_COMMAND --quiet -ah --delete $FULL_BACKUP/ $DESTINATION  &> $LOG_FILE || fail
+			echo -e "...done.\n"
+
+			echo "Preparing the base backup in the destination..."
+			$XTRABACKUP --prepare --apply-log-only --target-dir=$DESTINATION &> $LOG_FILE || fail
+			echo -e "...done.\n"
+		
+			for INCREMENTAL in $(cat $BACKUP/backup.chain | tail -n +2); do
+				echo -e "Applying incremental from $INCREMENTAL...\n"
+				$XTRABACKUP  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &> $LOG_FILE || fail
 				echo -e "...done.\n"
+			done
 
-				echo "Preparing the base backup in the destination..."
-				$XTRABACKUP --prepare --apply-log-only --target-dir=$DESTINATION  &> $LOG_FILE
-				echo -e "...done.\n"
-			
-				for INCREMENTAL in $(cat $BACKUP/backup.chain | tail -n +2); do
-					echo -e "Applying incremental from $INCREMENTAL...\n"
-					$XTRABACKUP  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &> $LOG_FILE
-					echo -e "...done.\n"
-				done
-
-				echo "Finalising the destination..."
-				$XTRABACKUP --prepare --target-dir=$DESTINATION  &> $LOG_FILE
-				echo -e "...done.\n"
-			)  || die "...FAILED! See $LOG_FILE for details - aborting."
-
+			echo "Finalising the destination..."
+			$XTRABACKUP --prepare --target-dir=$DESTINATION  &> $LOG_FILE || fail
+			echo -e "...done.\n"
 		fi
 		
 		rm $LOG_FILE # no errors, no need to keep it
 		
 		echo -e "The destination is ready. All you need to do now is:
-		- ensure the MySQL user owns the destination directory, e.g.: chown -R mysql:mysql $DESTINATION
-		- stop MySQL server
-		- replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of $DESTINATION
-		- start MySQL server again"
+	- ensure the MySQL user owns the destination directory, e.g.: chown -R mysql:mysql $DESTINATION
+	- stop MySQL server
+	- replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of $DESTINATION
+	- start MySQL server again"
 	else
 		die "Backup not found. To see the list of the available backups, run: $0 list"
 	fi
