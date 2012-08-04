@@ -8,6 +8,7 @@ die () {
 DUPLICITY=$(which duplicity)
 [ ! -f "$DUPLICITY" ] && die "Duplicity not found - please ensure it is installed before proceeding."
 
+
 CONFIG_FILE=$HOME/.duplicity.config
 
 if [ -f $CONFIG_FILE ]; then
@@ -19,8 +20,11 @@ BACKUP_SOURCE_DIRECTORIES=(/home /root /var/www /var/log /etc /usr/local)
 BACKUP_USER="$(whoami)"
 BACKUP_HOST=
 BACKUP_TARGET_DIRECTORY="duplicity/"
-KEEP_FULL_BACKUPS=4
-VERBOSITY=4
+KEEP_FULL_BACKUPS=8
+MAX_INCREMENTALS_AGE=1W
+MAX_CHAIN_AGE=2M
+MAX_VOLUME_SIZE=250
+VERBOSITY=4 # 0 is total silent, 4 is the default, and 9 is noisiest
 DUPLICITY_PASSPHRASE=
 EOF
 
@@ -34,11 +38,17 @@ fi
 	[ -n "$DUPLICITY_PASSPHRASE" ]
 ) || die "Please ensure all the settings are defined in the configuration file ($HOME/.duplicity.config)."
 
+IONICE=$(which ionice)
+
+if [ -n "$IONICE" ]; then
+	IONICE_COMMAND="$IONICE -c2 -n7"
+fi
+
 BACKUP_TARGET_DIRECTORY=$BACKUP_TARGET_DIRECTORY/$(hostname)
 TARGET="rsync://$BACKUP_USER@$BACKUP_HOST/$BACKUP_TARGET_DIRECTORY"
 INCLUDE="$(for s in ${BACKUP_SOURCE_DIRECTORIES[@]} ; do echo --include=$s; done)"
-DUPLICITY_SETTINGS="--verbosity=${VERBOSITY-warning} --archive=/tmp/duplicity --allow-source-mismatch"
-DUPLICITY_COMMAND="$(which nice) -n 15 $(which ionice) -c2 -n7 duplicity $DUPLICITY_SETTINGS"
+DUPLICITY_SETTINGS="--verbosity=${VERBOSITY-warning} --archive=/tmp/duplicity --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE"
+DUPLICITY_COMMAND="$(which nice) -n 15 $IONICE_COMMAND duplicity $DUPLICITY_SETTINGS"
 
 ssh $BACKUP_USER@$BACKUP_HOST mkdir -vp $BACKUP_TARGET_DIRECTORY
 
@@ -48,14 +58,15 @@ ssh $BACKUP_USER@$BACKUP_HOST mkdir -vp $BACKUP_TARGET_DIRECTORY
   if [ "$1" = "full" ]; then
     $DUPLICITY_COMMAND full $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
   elif [ "$1" = "incr" ]; then
-    $DUPLICITY_COMMAND incr $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
+  	$DUPLICITY_COMMAND incr --full-if-older-than=$MAX_INCREMENTALS_AGE $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
   else
     die "Periodicity not specified: Please run: as $0 [incr|full]"
   fi
 
-  $DUPLICITY_COMMAND remove-all-but-n-full $KEEP_FULL_BACKUPS $TARGET --force
+	$DUPLICITY_COMMAND remove-all-but-n-full $KEEP_FULL_BACKUPS $TARGET --force
+	$DUPLICITY_COMMAND remove-older-than $MAX_CHAIN_AGE $TARGET --force
 	$DUPLICITY_COMMAND cleanup --extra-clean --force $TARGET
-  $DUPLICITY_COMMAND collection-status $TARGET
+	$DUPLICITY_COMMAND collection-status $TARGET
 
 	unset DUPLICITY_PASSPHRASE
 	unset PASSPHRASE
