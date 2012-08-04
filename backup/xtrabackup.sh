@@ -151,7 +151,6 @@ elif [ "$1" = "restore" ]; then
 			echo -e "...done.\n"
 
 			echo "Preparing the base backup in the destination..."
-			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION
 			$XTRABACKUP --prepare --apply-log-only --target-dir=$DESTINATION
 			echo -e "...done.\n"
 			
@@ -160,8 +159,11 @@ elif [ "$1" = "restore" ]; then
 				$XTRABACKUP  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL
 				echo -e "...done.\n"
 			done
-			
-			echo "incrementals not ready..."
+
+			echo "Finalising the destination..."
+			$XTRABACKUP --prepare --target-dir=$DESTINATION
+			echo -e "...done.\n"
+
 		fi
 		
 		echo -e "The destination is ready. All you need to do now is:
