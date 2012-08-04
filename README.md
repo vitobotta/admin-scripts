@@ -108,5 +108,40 @@ Latest backup available:
         Incremental: 2012-08-04_16-04-19
 ``` 
 
+#### Restoring ####
+
+Restoring a backup is as simple as:
+
+``` bash
+$ backup/xtrabackup.sh restore <BACKUP TIME STAMP> <DESTINATION DIRECTORY>
+  
+# e.g. #
+
+$ backup/xtrabackup.sh restore 2012-08-04_19-03-46 /test-restore/
+Loading configuration from /root/.xtrabackup.config.
+!! About to restore MySQL backup taken on 2012-08-04_19-03-46 to /test-restore/ !!
+
+- Restore of full backup from /backup/mysql//full/2012-08-04_18-50-09
+Copying data files to destination...
+...done.
+
+Preparing the base backup in the destination...
+...done.
+
+Applying incremental from /backup/mysql//incr/2012-08-04_19-03-46...\n
+...done.
+
+Finalising the destination...
+...done.
+
+The destination is ready. All you need to do now is:
+                - ensure the MySQL user owns the destination directory, e.g.: chown -R mysql:mysql /test-restore/
+                - stop MySQL server
+                - replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of /test-restore/
+                - start MySQL server again
+```
+
+The backup timestamp must be that of a valid full or incremental backup as shown running *backup/xtrabackup.sh list*.
+The restore will first process the base backup of the relevant backup chain (that is, the full backup) and then, if an incremental has been specified, all incrementals up to that one will be applied to the destination.
 
 **TODO**: support for automated restores. For the time being, please check [this blog post](http://vitobotta.com/painless-hot-backups-mysql-live-databases-percona-xtrabackup/ "Painless, ultra fast hot backups and restores of MySQL databases with Percona's XtraBackup") on restoring full backups, and [this page](http://www.percona.com/doc/percona-xtrabackup/xtrabackup_bin/incremental_backups.html?id=percona-xtrabackup:xtrabackup:incremental) on the Percona website on how to restore from incrementals.
