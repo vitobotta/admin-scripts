@@ -1,7 +1,7 @@
 #!/bin/bash
 
 die () {
-	echo 1>&2 "$@"
+	echo -e 1>&2 "$@"
 	exit 1
 }
 
@@ -41,6 +41,7 @@ if [ -n "$IONICE" ]; then
 fi
 
 INNOBACKUPEX_COMMAND="$(which nice) -n 15 $IONICE_COMMAND $INNOBACKUPEX"
+RSYNC_COMMAND="$(which nice) -n 15 $IONICE_COMMAND  $(which rsync)"
 
 full_backup () {
 	$INNOBACKUPEX_COMMAND --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" "$FULLS_DIRECTORY"
@@ -111,6 +112,44 @@ elif [ "$1" = "list" ]; then
 		exit 1
 	else
 		die "No backup chains available in the backup directory specified in the configuration ($BACKUPS_DIRECTORY)"
+	fi
+elif [ "$1" = "restore" ]; then
+	([ -n "$2" ] && [ -n "$3" ]) || die "Missing arguments. Please run as: \n\t$0 restore <timestamp> <destination folder>\nTo see the list of the available backups, run:\n\t$0 list"
+		
+	BACKUP_TIMESTAMP="$2"
+	DESTINATION="$3"
+	BACKUP=`find $BACKUPS_DIRECTORY -mindepth 2 -maxdepth 2 -type d -name $BACKUP_TIMESTAMP -exec ls -dt {} \+ | head -1`
+	
+	(mkdir -vp $DESTINATION) || die "Could not access destination folder $3 - aborting"
+	
+	if [[ -d "$BACKUP" ]]; then
+		echo -e "!! About to restore MySQL backup taken on $BACKUP_TIMESTAMP to $DESTINATION !!\n"
+		
+		if [[ "$BACKUP" == *full* ]]; then
+			echo "- Restore of full backup taken on $BACKUP_TIMESTAMP"
+
+			echo "Copying data files to destination..."
+			$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION
+			echo -e "...done.\n"
+
+			echo "Preparing the destination for use with MySQL..."
+			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION
+			echo -e "...done.\n"
+			
+			echo << EOS
+				The destination is ready. All you need to do now is:
+					- ensure the MySQL user owns the destination directory, e.g.
+							chown -R mysql:mysql $DESTINATION
+					- stop MySQL server
+					- replace the content of the MySQL datadir (usually /var/lib/mysql) with the content of $DESTINATION
+					- start MySQL server again
+EOS		
+
+		else
+			echo "incrementals not ready..."
+		fi
+	else
+		die "Backup not found. To see the list of the available backups, run: $0 list"
 	fi
 else
   die "Backup type not specified. Please run: as $0 [incr|full]"
