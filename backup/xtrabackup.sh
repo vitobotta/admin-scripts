@@ -65,3 +65,6 @@ if [[ $BACKUP_CHAINS -gt $MAX_BACKUP_CHAINS ]]; then
 		rm -rf $FULLS_DIRECTORY/$FULL_BACKUP
 	done
 fi
+
+unset MYSQL_USER
+unset MYSQL_PASS
