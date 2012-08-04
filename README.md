@@ -64,4 +64,27 @@ xtrabackup.sh [incr|full]
 
 where the single argument determines whether you want to perform a full or incremental backup. If running an incremental backup but no previous backups are found in the target directory, a full backup is performed instead.
 
+Backups are stored with the following folder structure:
+
+``` bash
+├── full
+│   ├── 2012-08-04_15-54-23
+│   └── 2012-08-04_15-59-29
+└── incr
+    ├── 2012-08-04_15-55-01
+    └── 2012-08-04_15-56-44
+```
+
+Each folder has a file named *backup.chain* that contains all the folders (full + incrementals) that belong to that backup chain/set. This is useful when restoring from an incremental. E.g.
+
+``` bash
+$ cat incr/2012-08-04_16-04-19/backup.chain 
+/backup/mysql//full/2012-08-04_15-59-29
+/backup/mysql//incr/2012-08-04_16-02-42
+/backup/mysql//incr/2012-08-04_16-03-34
+/backup/mysql//incr/2012-08-04_16-04-19
+``` 
+
+The older if of course the order with which these full + incremental backups should be restored.
+
 **TODO**: support for automated restores. For the time being, please check [this blog post](http://vitobotta.com/painless-hot-backups-mysql-live-databases-percona-xtrabackup/ "Painless, ultra fast hot backups and restores of MySQL databases with Percona's XtraBackup") on restoring full backups, and [this page](http://www.percona.com/doc/percona-xtrabackup/xtrabackup_bin/incremental_backups.html?id=percona-xtrabackup:xtrabackup:incremental) on the Percona website on how to restore from incrementals.
