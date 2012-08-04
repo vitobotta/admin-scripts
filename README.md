@@ -12,7 +12,7 @@ The first time it runs it creates the configuration file ~/.duplicity.config (in
 ``` bash
 BACKUP_SOURCE_DIRECTORIES=(/home /root /var/www /var/log /etc /usr/local)
 BACKUP_USER=your current username
-BACKUP_HOST=(left empty)
+BACKUP_HOST=(left blank)
 BACKUP_TARGET_DIRECTORY="duplicity/"
 MAX_FULL_BACKUPS=8
 MAX_INCREMENTALS_AGE=1W
@@ -48,7 +48,7 @@ On the first run, the script creates the configuration file ~/.xtrabackup.config
 
 ``` bash
 MYSQL_USER=your current MySQL username
-MYSQL_PASS=(left empty)
+MYSQL_PASS=(left blank)
 MYSQL_DATA_DIR=/var/lib/mysql/
 BACKUPS_DIRECTORY=$HOME/mysql-backups
 MAX_BACKUP_CHAINS=3
