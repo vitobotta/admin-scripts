@@ -42,15 +42,15 @@ fi
 
 INNOBACKUPEX_COMMAND="$(which nice) -n 15 $IONICE_COMMAND $INNOBACKUPEX"
 
-if [ "$1" = "full" ]; then
+full_backup () {
 	$INNOBACKUPEX_COMMAND --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" "$FULLS_DIRECTORY"
 
 	NEW_BACKUP_DIR=$(find $FULLS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 
 	echo $NEW_BACKUP_DIR > $NEW_BACKUP_DIR/backup.chain
+}
 
-elif [ "$1" = "incr" ]; then
-	LAST_CHECKPOINTS=$(find "$FULLS_DIRECTORY"/../ -mindepth 3 -maxdepth 3 -type f -name xtrabackup_checkpoints -exec ls -dt {} \+ | head -1)
+incremental_backup () {
 	LAST_BACKUP=${LAST_CHECKPOINTS%/xtrabackup_checkpoints}
 
 	$INNOBACKUPEX_COMMAND --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" --incremental --incremental-basedir="$LAST_BACKUP" "$INCREMENTALS_DIRECTORY"
@@ -58,7 +58,18 @@ elif [ "$1" = "incr" ]; then
 	NEW_BACKUP_DIR=$(find $INCREMENTALS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 	cp $LAST_BACKUP/backup.chain $NEW_BACKUP_DIR/
 	echo $NEW_BACKUP_DIR >> $NEW_BACKUP_DIR/backup.chain
+}
 
+if [ "$1" = "full" ]; then
+	full_backup
+elif [ "$1" = "incr" ]; then
+	LAST_CHECKPOINTS=$(find "$FULLS_DIRECTORY"/../ -mindepth 3 -maxdepth 3 -type f -name xtrabackup_checkpoints -exec ls -dt {} \+ | head -1)
+	
+	if [[ -f $LAST_CHECKPOINTS ]]; then
+		incremental_backup
+	else
+		full_backup
+	fi
 else
   die "Backup type not specified. Please run: as $0 [incr|full]"
 fi
