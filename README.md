@@ -9,7 +9,6 @@ Simple administration scripts I use on my servers.
 Performs encrypted, incremental backups to a remote server using [duplicity](http://duplicity.nongnu.org). 
 The first time it runs it creates the configuration file ~/.duplicity.config (in your home folder) with the following defaults:
 
-
 ``` bash
 BACKUP_SOURCE_DIRECTORIES=(/home /root /var/www /var/log /etc /usr/local)
 BACKUP_USER=your current username
