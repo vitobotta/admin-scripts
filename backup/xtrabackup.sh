@@ -19,7 +19,7 @@ MYSQL_USER="$(whoami)"
 MYSQL_PASS=
 MYSQL_DATA_DIR=/var/lib/mysql/
 BACKUPS_DIRECTORY=$HOME/mysql-backups
-MAX_BACKUP_CHAINS=3
+MAX_BACKUP_CHAINS=8
 EOF
 
 	die "Configuration has been initialised in $CONFIG_FILE. \nPlease make sure all settings are correctly defined/customised - aborting."
@@ -34,8 +34,16 @@ INCREMENTALS_DIRECTORY=$BACKUPS_DIRECTORY/incr
 mkdir -vp $FULLS_DIRECTORY
 mkdir -vp $INCREMENTALS_DIRECTORY
 
+IONICE=$(which ionice)
+
+if [ -n "$IONICE" ]; then
+	IONICE_COMMAND="$IONICE -c2 -n7"
+fi
+
+INNOBACKUPEX_COMMAND="$(which nice) -n 15 $IONICE_COMMAND $INNOBACKUPEX"
+
 if [ "$1" = "full" ]; then
-	$INNOBACKUPEX --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" "$FULLS_DIRECTORY"
+	$INNOBACKUPEX_COMMAND --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" "$FULLS_DIRECTORY"
 
 	NEW_BACKUP_DIR=$(find $FULLS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 
@@ -45,7 +53,7 @@ elif [ "$1" = "incr" ]; then
 	LAST_CHECKPOINTS=$(find "$FULLS_DIRECTORY"/../ -mindepth 3 -maxdepth 3 -type f -name xtrabackup_checkpoints -exec ls -dt {} \+ | head -1)
 	LAST_BACKUP=${LAST_CHECKPOINTS%/xtrabackup_checkpoints}
 
-	$INNOBACKUPEX --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" --incremental --incremental-basedir="$LAST_BACKUP" "$INCREMENTALS_DIRECTORY"
+	$INNOBACKUPEX_COMMAND --slave-info --user="$MYSQL_USER" --password="$MYSQL_PASS" --incremental --incremental-basedir="$LAST_BACKUP" "$INCREMENTALS_DIRECTORY"
 
 	NEW_BACKUP_DIR=$(find $INCREMENTALS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 	cp $LAST_BACKUP/backup.chain $NEW_BACKUP_DIR/
