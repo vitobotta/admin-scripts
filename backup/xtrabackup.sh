@@ -60,6 +60,7 @@ incremental_backup () {
 	echo $NEW_BACKUP_DIR >> $NEW_BACKUP_DIR/backup.chain
 }
 
+
 if [ "$1" = "full" ]; then
 	full_backup
 elif [ "$1" = "incr" ]; then
@@ -69,6 +70,47 @@ elif [ "$1" = "incr" ]; then
 		incremental_backup
 	else
 		full_backup
+	fi
+elif [ "$1" = "list" ]; then
+	if [[ -d $FULLS_DIRECTORY ]]; then
+		BACKUP_CHAINS=$(ls $FULLS_DIRECTORY | wc -l)
+	else
+		BACKUP_CHAINS=0
+	fi
+		
+	if [[ $BACKUP_CHAINS -gt 0 ]]; then
+		echo -e "Available backup chains (from oldest to latest):\n"
+
+		for FULL_BACKUP in `ls $FULLS_DIRECTORY -tr`; do
+			let COUNTER=COUNTER+1
+
+			echo "Backup chain $COUNTER:"
+			echo -e "\tFull:        $FULL_BACKUP"
+
+			grep -l $FULL_BACKUP $INCREMENTALS_DIRECTORY/**/backup.chain | \
+			while read INCREMENTAL; 
+			do 
+				BACKUP_DATE=${INCREMENTAL%/backup.chain}
+				echo -e "\tIncremental: ${BACKUP_DATE##*/}"
+			done
+		done
+		
+		LATEST_BACKUP=$(find $BACKUPS_DIRECTORY -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1)
+		
+		[[ "$LATEST_BACKUP" == *full* ]] && IS_FULL=1 || IS_FULL=0
+
+		BACKUP_DATE=${LATEST_BACKUP##*/}
+
+		if [[ "$LATEST_BACKUP" == *full* ]]
+		then
+		  echo -e "\nLatest backup available:\n\tFull: $BACKUP_DATE"
+		else
+		  echo -e "\nLatest backup available:\n\tIncremental: $BACKUP_DATE"
+		fi
+		
+		exit 1
+	else
+		die "No backup chains available in the backup directory specified in the configuration ($BACKUPS_DIRECTORY)"
 	fi
 else
   die "Backup type not specified. Please run: as $0 [incr|full]"
