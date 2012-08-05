@@ -65,62 +65,70 @@ if [ -n "$IONICE" ]; then
 	IONICE_COMMAND="$IONICE -c2 -n7"
 fi
 
-INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
-
-BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $TARGET"
+ENCRYPTION_SETTINGS=""
 
 if [[ $ENCRYPTION -eq 1 ]]; then
-	[ -n "$ENCRYPT_KEY" ] && BACKUP_SETTINGS="$BACKUP_SETTINGS --encrypt-key=$ENCRYPT_KEY"
-	[ -n "$SIGN_KEY" ] && BACKUP_SETTINGS="$BACKUP_SETTINGS --sign-key=$SIGN_KEY"
+	[ -n "$ENCRYPT_KEY" ] && ENCRYPTION_SETTINGS="$ENCRYPTION_SETTINGS --encrypt-key=$ENCRYPT_KEY"
+	[ -n "$SIGN_KEY" ] && ENCRYPTION_SETTINGS="$ENCRYPTION_SETTINGS --sign-key=$SIGN_KEY"
 	
-	BACKUP_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $BACKUP_SETTINGS"
-else
-	# export GZIP="-1"
-	BACKUP_SETTINGS=" $BACKUP_SETTINGS"
+	ENCRYPTION_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $ENCRYPTION_SETTINGS"
 fi
 
+INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
+BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $TARGET"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
-if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
-	echo -e "Running 'before' scripts...\n"
-	for SCRIPT in ${RUN_BEFORE[@]}; do
-		if [ -f $SCRIPT ]; then
-			$SCRIPT "$@"
-		else
-			echo "WARNING: before script $SCRIPT not found"
-		fi
-	done
-	echo
-fi
+before_backup () {
+	if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
+		echo -e "Running 'before' scripts...\n"
+		for SCRIPT in ${RUN_BEFORE[@]}; do
+			if [ -f $SCRIPT ]; then
+				$SCRIPT "$@"
+			else
+				echo "WARNING: before script $SCRIPT not found"
+			fi
+		done
+		echo
+	fi
+}
+
+after_backup () {
+	$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
+	$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
+	$DUPLICITY cleanup --extra-clean --force $TARGET
+	$DUPLICITY collection-status $TARGET
+
+	if [ ${#RUN_AFTER[@]} -gt 0 ]; then
+		echo -e "Running 'after' scripts...\n"
+		for SCRIPT in ${RUN_AFTER[@]}; do
+			if [ -f $SCRIPT ]; then
+				$SCRIPT "$@"
+			else
+				echo "WARNING: before script $SCRIPT not found"
+			fi
+		done
+		echo
+	fi
+}
+
 
 [ -n "$PASSPHRASE" ] && export PASSPHRASE=$PASSPHRASE
 [ -n "$SIGN_KEY_PASSPHRASE" ] && export SIGN_PASSPHRASE=$SIGN_KEY_PASSPHRASE
 
 if [ "$1" = "full" ]; then
-  $DUPLICITY full $BACKUP_SETTINGS 
+	before_backup
+  $DUPLICITY full $ENCRYPTION_SETTINGS $BACKUP_SETTINGS 
+	after_backup
 elif [ "$1" = "incr" ]; then
-	$DUPLICITY incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $BACKUP_SETTINGS 
+	before_backup
+	$DUPLICITY incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $ENCRYPTION_SETTINGS $BACKUP_SETTINGS 
+	after_backup
+elif [ "$1" = "restore" ]; then
+	echo $DUPLICITY $ENCRYPTION_SETTINGS restore $TARGET "${*:2}"
 else
-  die "Backup type not specified. Please run: as $0 [incr|full]"
+	$DUPLICITY $ENCRYPTION_SETTINGS "$@" $TARGET 
 fi
-
-$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
-$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
-$DUPLICITY cleanup --extra-clean --force $TARGET
-$DUPLICITY collection-status $TARGET
 
 unset DUPLICITY_PASSPHRASE
 unset SIGN_PASSPHRASE
 unset PASSPHRASE
-
-if [ ${#RUN_AFTER[@]} -gt 0 ]; then
-	echo -e "Running 'after' scripts...\n"
-	for SCRIPT in ${RUN_AFTER[@]}; do
-		if [ -f $SCRIPT ]; then
-			$SCRIPT "$@"
-		else
-			echo "WARNING: before script $SCRIPT not found"
-		fi
-	done
-	echo
-fi
