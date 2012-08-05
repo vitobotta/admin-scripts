@@ -16,13 +16,17 @@ if [ -f $CONFIG_FILE ]; then
 	source $CONFIG_FILE
 else
 cat << EOF > $CONFIG_FILE
-BACKUP_SOURCE_DIRECTORIES=(/home /root /var/www /var/log /etc /usr/local)
-BACKUP_USER="$(whoami)"
-BACKUP_HOST=
-BACKUP_TARGET_DIRECTORY="duplicity/"
-MAX_FULL_BACKUPS=8
-MAX_INCREMENTALS_AGE=1W
-MAX_CHAIN_AGE=2M
+INCLUDE=(/home /root /var/www /var/log /etc /usr/local)
+
+# Uncomment the following line to backup to a local directory or a locally mounted network share
+# TARGET="file:///some/local/directory"
+
+# Uncomment the following line to backup to a remote directory
+# TARGET="rsync://user@host/destination-directory"
+
+MAX_FULL_BACKUPS_TO_RETAIN=8
+MAX_AGE_INCREMENTALS_TO_RETAIN=1W
+MAX_AGE_CHAINS_TO_RETAIN=2M
 MAX_VOLUME_SIZE=250
 VERBOSITY=4 # 0 is total silent, 4 is the default, and 9 is noisiest
 DUPLICITY_PASSPHRASE=
@@ -37,8 +41,9 @@ EOF
 	die "Configuration has been initialised in $CONFIG_FILE. \nPlease make sure all settings are correctly defined/customised - aborting."
 fi
 
-[ -n "$BACKUP_USER" -a -n "$BACKUP_USER" -a -n "$BACKUP_HOST" -a -n "$BACKUP_TARGET_DIRECTORY" -a -n "$DUPLICITY_PASSPHRASE" ] \
-	|| die "Please ensure all the settings are defined in the configuration file ($HOME/.duplicity.config)."
+[ ${#INCLUDE[@]} -gt 0 ] || die "Please set which directories you want to backup (setting 'INCLUDE' in the configuration file)."
+[ -n "$TARGET" ] || die "Please set the destination directory that will contain your backups (setting 'TARGET' in the configuration file)."
+[ -n "$DUPLICITY_PASSPHRASE" ] || die "Please set the passphrase Duplicity requires for GPG encryption (setting 'DUPLICITY_PASSPHRASE' in the configuration file)."
 
 IONICE=$(which ionice)
 
@@ -46,9 +51,7 @@ if [ -n "$IONICE" ]; then
 	IONICE_COMMAND="$IONICE -c2 -n7"
 fi
 
-BACKUP_TARGET_DIRECTORY=$BACKUP_TARGET_DIRECTORY/$(hostname)
-TARGET="rsync://$BACKUP_USER@$BACKUP_HOST/$BACKUP_TARGET_DIRECTORY"
-INCLUDE="$(for s in ${BACKUP_SOURCE_DIRECTORIES[@]} ; do echo --include=$s; done)"
+INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
 DUPLICITY_SETTINGS="--verbosity=${VERBOSITY-warning} --archive=/tmp/duplicity --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE"
 DUPLICITY_COMMAND="$(which nice) -n 15 $IONICE_COMMAND duplicity $DUPLICITY_SETTINGS"
 
@@ -65,21 +68,19 @@ if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 fi
 
 
-ssh $BACKUP_USER@$BACKUP_HOST mkdir -vp $BACKUP_TARGET_DIRECTORY
-
 ( 
   export PASSPHRASE=$DUPLICITY_PASSPHRASE
 
   if [ "$1" = "full" ]; then
     $DUPLICITY_COMMAND full $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
   elif [ "$1" = "incr" ]; then
-  	$DUPLICITY_COMMAND incr --full-if-older-than=$MAX_INCREMENTALS_AGE $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
+  	$DUPLICITY_COMMAND incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
   else
     die "Backup type not specified. Please run: as $0 [incr|full]"
   fi
 
-	$DUPLICITY_COMMAND remove-all-but-n-full $MAX_FULL_BACKUPS $TARGET --force
-	$DUPLICITY_COMMAND remove-older-than $MAX_CHAIN_AGE $TARGET --force
+	$DUPLICITY_COMMAND remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
+	$DUPLICITY_COMMAND remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
 	$DUPLICITY_COMMAND cleanup --extra-clean --force $TARGET
 	$DUPLICITY_COMMAND collection-status $TARGET
 
