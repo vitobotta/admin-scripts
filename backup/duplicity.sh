@@ -21,16 +21,16 @@ else
 cat << EOF > $CONFIG_FILE
 INCLUDE=(/home /root /var/www /var/log /etc /usr/local)
 
-# Uncomment the following line to backup to a local directory or a locally mounted network share
+# Uncomment and set the following to backup to a local directory or a locally mounted network share
 # TARGET="file:///some/local/directory"
 
-# Uncomment the following line to backup to a remote directory
+# Uncomment and set the following to backup to a remote directory
 # TARGET="rsync://user@host/destination-directory"
 
 MAX_FULL_BACKUPS_TO_RETAIN=8
 MAX_AGE_INCREMENTALS_TO_RETAIN=1W
 MAX_AGE_CHAINS_TO_RETAIN=2M
-MAX_VOLUME_SIZE=250
+MAX_VOLUME_SIZE=25
 
 ENCRYPTION=1
 PASSPHRASE= # used for ENCRYPT_KEY or, if this is not specified, for symmetric encryption
@@ -42,7 +42,7 @@ PASSPHRASE= # used for ENCRYPT_KEY or, if this is not specified, for symmetric e
 # SIGN_KEY=
 # SIGN_KEY_PASSPHRASE=
 
-COMPRESSION_LEVEL=6 # 0 disables compression
+COMPRESSION_LEVEL=6 # 1-9; 0 disables compression; it currently works only if encryption is enabled
 
 VERBOSITY=4 # 0 Error, 2 Warning, 4 Notice (default), 8 Info, 9 Debug (noisiest)
 
@@ -67,20 +67,19 @@ fi
 
 INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
 
-DUPLICITY_SETTINGS="--verbosity=${VERBOSITY-warning} --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE"
+BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $TARGET"
 
 if [[ $ENCRYPTION -eq 1 ]]; then
-	[ -n "$ENCRYPT_KEY" ] && DUPLICITY_SETTINGS="$DUPLICITY_SETTINGS --encrypt-key=$ENCRYPT_KEY"
-	[ -n "$SIGN_KEY" ] && DUPLICITY_SETTINGS="$DUPLICITY_SETTINGS --sign-key=$SIGN_KEY"
-	# --gpg-options='--compress-algo=bzip2'
-	#  --gpg-options='--compress-algo=bzip2'
+	[ -n "$ENCRYPT_KEY" ] && BACKUP_SETTINGS="$BACKUP_SETTINGS --encrypt-key=$ENCRYPT_KEY"
+	[ -n "$SIGN_KEY" ] && BACKUP_SETTINGS="$BACKUP_SETTINGS --sign-key=$SIGN_KEY"
+	
+	BACKUP_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $BACKUP_SETTINGS"
 else
 	# export GZIP="-1"
-	DUPLICITY_SETTINGS="$DUPLICITY_SETTINGS --no-encryption"
+	BACKUP_SETTINGS=" $BACKUP_SETTINGS"
 fi
 
-
-DUPLICITY_COMMAND="$(which nice) -n 15 $IONICE_COMMAND duplicity $DUPLICITY_SETTINGS"
+DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
 if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 	echo -e "Running 'before' scripts...\n"
@@ -94,28 +93,25 @@ if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 	echo
 fi
 
+[ -n "$PASSPHRASE" ] && export PASSPHRASE=$PASSPHRASE
+[ -n "$SIGN_KEY_PASSPHRASE" ] && export SIGN_PASSPHRASE=$SIGN_KEY_PASSPHRASE
 
-( 
-  [ -n "$PASSPHRASE" ] && export PASSPHRASE=$PASSPHRASE
-	[ -n "$SIGN_KEY_PASSPHRASE" ] && export SIGN_PASSPHRASE=$SIGN_KEY_PASSPHRASE
+if [ "$1" = "full" ]; then
+  $DUPLICITY full $BACKUP_SETTINGS 
+elif [ "$1" = "incr" ]; then
+	$DUPLICITY incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $BACKUP_SETTINGS 
+else
+  die "Backup type not specified. Please run: as $0 [incr|full]"
+fi
 
-  if [ "$1" = "full" ]; then
-    $DUPLICITY_COMMAND full $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
-  elif [ "$1" = "incr" ]; then
-  	$DUPLICITY_COMMAND incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $INCLUDE --exclude='**' --asynchronous-upload / $TARGET
-  else
-    die "Backup type not specified. Please run: as $0 [incr|full]"
-  fi
+$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
+$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
+$DUPLICITY cleanup --extra-clean --force $TARGET
+$DUPLICITY collection-status $TARGET
 
-	$DUPLICITY_COMMAND remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
-	$DUPLICITY_COMMAND remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
-	$DUPLICITY_COMMAND cleanup --extra-clean --force $TARGET
-	$DUPLICITY_COMMAND collection-status $TARGET
-
-	unset DUPLICITY_PASSPHRASE
-	unset SIGN_PASSPHRASE
-	unset PASSPHRASE
-)
+unset DUPLICITY_PASSPHRASE
+unset SIGN_PASSPHRASE
+unset PASSPHRASE
 
 if [ ${#RUN_AFTER[@]} -gt 0 ]; then
 	echo -e "Running 'after' scripts...\n"
