@@ -22,10 +22,10 @@ cat << EOF > $CONFIG_FILE
 INCLUDE=(/home /root /var/www /var/log /etc /usr/local)
 
 # Uncomment and set the following to backup to a local directory or a locally mounted network share
-# TARGET="file:///some/local/directory"
+# BACKUP_REPOSITORY="file:///some/local/directory"
 
 # Uncomment and set the following to backup to a remote directory
-# TARGET="rsync://user@host/destination-directory"
+# BACKUP_REPOSITORY="rsync://user@host/destination-directory"
 
 MAX_FULL_BACKUPS_TO_RETAIN=8
 MAX_AGE_INCREMENTALS_TO_RETAIN=1W
@@ -57,7 +57,7 @@ EOF
 fi
 
 [ ${#INCLUDE[@]} -gt 0 ] || die "Please set which directories you want to backup (setting 'INCLUDE' in the configuration file)."
-[ -n "$TARGET" ] || die "Please set the destination directory that will contain your backups (setting 'TARGET' in the configuration file)."
+[ -n "$BACKUP_REPOSITORY" ] || die "Please set the destination directory that will contain your backups (setting 'BACKUP_REPOSITORY' in the configuration file)."
 
 IONICE=$(which ionice)
 
@@ -67,15 +67,15 @@ fi
 
 ENCRYPTION_SETTINGS=""
 
-if [[ $ENCRYPTION -eq 1 ]]; then
+if [ "$ENCRYPTION" -eq "1" ]; then
 	[ -n "$ENCRYPT_KEY" ] && ENCRYPTION_SETTINGS="$ENCRYPTION_SETTINGS --encrypt-key=$ENCRYPT_KEY"
 	[ -n "$SIGN_KEY" ] && ENCRYPTION_SETTINGS="$ENCRYPTION_SETTINGS --sign-key=$SIGN_KEY"
 	
-	ENCRYPTION_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $ENCRYPTION_SETTINGS"
+	[ "$1" = "full" -o "$1" = "incr" ] && ENCRYPTION_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $ENCRYPTION_SETTINGS"
 fi
 
 INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
-BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $TARGET"
+BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $BACKUP_REPOSITORY"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
 before_backup () {
@@ -93,10 +93,10 @@ before_backup () {
 }
 
 after_backup () {
-	$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $TARGET --force
-	$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $TARGET --force
-	$DUPLICITY cleanup --extra-clean --force $TARGET
-	$DUPLICITY collection-status $TARGET
+	$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $BACKUP_REPOSITORY --force
+	$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $BACKUP_REPOSITORY --force
+	$DUPLICITY cleanup --extra-clean --force $BACKUP_REPOSITORY
+	$DUPLICITY collection-status $BACKUP_REPOSITORY
 
 	if [ ${#RUN_AFTER[@]} -gt 0 ]; then
 		echo -e "Running 'after' scripts...\n"
@@ -123,10 +123,10 @@ elif [ "$1" = "incr" ]; then
 	before_backup
 	$DUPLICITY incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $ENCRYPTION_SETTINGS $BACKUP_SETTINGS 
 	after_backup
-elif [ "$1" = "restore" ]; then
-	echo $DUPLICITY $ENCRYPTION_SETTINGS restore $TARGET "${*:2}"
 else
-	$DUPLICITY $ENCRYPTION_SETTINGS "$@" $TARGET 
+	export BACKUP_SOURCE=$BACKUP_REPOSITORY
+	echo $DUPLICITY $ENCRYPTION_SETTINGS "$@"
+	$DUPLICITY $ENCRYPTION_SETTINGS "$@"
 fi
 
 unset DUPLICITY_PASSPHRASE
