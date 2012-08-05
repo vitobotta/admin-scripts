@@ -125,7 +125,6 @@ elif [ "$1" = "incr" ]; then
 	after_backup
 else
 	export BACKUP_SOURCE=$BACKUPS_REPOSITORY
-	echo $DUPLICITY $ENCRYPTION_SETTINGS "$@"
 	$DUPLICITY $ENCRYPTION_SETTINGS "$@"
 fi
 
