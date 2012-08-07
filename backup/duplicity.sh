@@ -124,7 +124,6 @@ elif [ "$1" = "incr" ]; then
 	$DUPLICITY incr --full-if-older-than=$MAX_AGE_INCREMENTALS_TO_RETAIN $ENCRYPTION_SETTINGS $BACKUP_SETTINGS 
 	after_backup
 else
-	export BACKUP_SOURCE=$BACKUPS_REPOSITORY
 	$DUPLICITY $ENCRYPTION_SETTINGS "$@"
 fi
 
