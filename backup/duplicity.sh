@@ -20,7 +20,7 @@ if [ -f $CONFIG_FILE ]; then
 else
 cat << EOF > $CONFIG_FILE
 INCLUDE=(/home /root /var/www /var/log /etc /usr/local)
-
+EXCLUDE=()
 # Uncomment and set the following to backup to a local directory or a locally mounted network share
 # BACKUPS_REPOSITORY="file:///some/local/directory"
 
@@ -75,7 +75,8 @@ if [ "$ENCRYPTION" -eq "1" ]; then
 fi
 
 INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
-BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** --asynchronous-upload / $BACKUPS_REPOSITORY"
+EXCLUDE="$(for s in ${EXCLUDE[@]} ; do echo --exclude=$s; done)"
+BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** $EXCLUDE --asynchronous-upload / $BACKUPS_REPOSITORY"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
 before_backup () {
