@@ -83,7 +83,7 @@ done
 
 echo "- **" >> $DUPLICITY_INCLUDE_LIST
 
-BACKUP_SETTINGS="--dry-run --verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE --exclude-globbing-filelist=$DUPLICITY_INCLUDE_LIST --asynchronous-upload / $BACKUPS_REPOSITORY"
+BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE --exclude-globbing-filelist=$DUPLICITY_INCLUDE_LIST --asynchronous-upload / $BACKUPS_REPOSITORY"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
 before_backup () {
