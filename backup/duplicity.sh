@@ -19,8 +19,8 @@ if [ -f $CONFIG_FILE ]; then
 	source $CONFIG_FILE
 else
 cat << EOF > $CONFIG_FILE
-INCLUDE=(/home /root /var/www /var/log /etc /usr/local)
-EXCLUDE=()
+INCLUDE=("/home" "/root" "/var/www" "/var/log" "/etc" "/usr/local")
+
 # Uncomment and set the following to backup to a local directory or a locally mounted network share
 # BACKUPS_REPOSITORY="file:///some/local/directory"
 
@@ -74,9 +74,16 @@ if [ "$ENCRYPTION" -eq "1" ]; then
 	[ "$1" = "full" -o "$1" = "incr" ] && ENCRYPTION_SETTINGS="--gpg-options=-z$COMPRESSION_LEVEL $ENCRYPTION_SETTINGS"
 fi
 
-INCLUDE="$(for s in ${INCLUDE[@]} ; do echo --include=$s; done)"
-EXCLUDE="$(for s in ${EXCLUDE[@]} ; do echo --exclude=$s; done)"
-BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE $INCLUDE --exclude=** $EXCLUDE --asynchronous-upload / $BACKUPS_REPOSITORY"
+
+DUPLICITY_INCLUDE_LIST=`tempfile`
+
+for i in $(seq 0 $((${#INCLUDE[*]} - 1))); do
+  echo "+ ${INCLUDE[$i]}" >> $DUPLICITY_INCLUDE_LIST
+done
+
+echo "- **" >> $DUPLICITY_INCLUDE_LIST
+
+BACKUP_SETTINGS="--dry-run --verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE --exclude-globbing-filelist=$DUPLICITY_INCLUDE_LIST --asynchronous-upload / $BACKUPS_REPOSITORY"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
 
 before_backup () {
@@ -94,6 +101,8 @@ before_backup () {
 }
 
 after_backup () {
+	[ -f "$DUPLICITY_INCLUDE_LIST" ] && rm $DUPLICITY_INCLUDE_LIST
+	
 	$DUPLICITY remove-all-but-n-full $MAX_FULL_BACKUPS_TO_RETAIN $BACKUPS_REPOSITORY --force
 	$DUPLICITY remove-older-than $MAX_AGE_CHAINS_TO_RETAIN $BACKUPS_REPOSITORY --force
 	$DUPLICITY cleanup --extra-clean --force $BACKUPS_REPOSITORY
