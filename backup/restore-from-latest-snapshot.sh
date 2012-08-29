@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# ---------------------------------------------------------------------------------------------
+# Just a script I use sometimes to download production data to my dev machine for testing etc
+# with real data.
+# ---------------------------------------------------------------------------------------------
+
+
 DB_NODES=(db1 db2 db3)
 
 die () {
