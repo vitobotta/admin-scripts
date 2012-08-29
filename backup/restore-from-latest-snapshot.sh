@@ -66,7 +66,7 @@ ssh $DB_NODE  <<\EOF
 
   [ -f $ARCHIVE ] && rm $ARCHIVE
 
-  GZIP=-9 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
+  tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
   rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
 
   echo "Compressed archive created."
