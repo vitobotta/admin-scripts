@@ -86,13 +86,28 @@ MYSQL_DATA_DIR=`echo "${MYSQL_DATA_DIR}" | sed -e "s/\/*$//" `
 
 [ -d $MYSQL_DATA_DIR ] || die "Uhm...can't find MySQL datadir"
 
+if [[ `uname -s` = "Darwin" ]]; then
+  # Assuming MySQL/Percona has been installed with homebrew...
+  MYSQL_STOP_COMMAND="mysql.server stop"
+  MYSQL_START_COMMAND="mysql.server start"
+else
+  MYSQL_STOP_COMMAND="service mysql stop"
+  MYSQL_START_COMMAND="service mysql start"
+fi
+
 (
-  mysql.server stop
+  $MYSQL_STOP_COMMAND
   
   mv $MYSQL_DATA_DIR{,.$(date +%Y-%m-%d-%H-%M-%S)}
   
   mkdir $MYSQL_DATA_DIR && cd $MYSQL_DATA_DIR 
   
-  tar xvfz $ARCHIVE && mv tmp/tmp*/* . && mysql.server start
+  tar xvfz $ARCHIVE 
+  
+  mv tmp/tmp*/* . 
+
+  [[ `uname -s` = "Linux" ]] && chown -R mysql:mysql .
+  
+  $MYSQL_START_COMMAND
 
 )
