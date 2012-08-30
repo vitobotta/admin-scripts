@@ -149,7 +149,10 @@ elif [ "$1" = "restore" ]; then
 			echo -e "...done.\n"
 		else
 			XTRABACKUP=$(which xtrabackup)
-			[ -f "$XTRABACKUP" ] || die "xtrabackup executable not found - this is required in order to restore from incrementals. Ensure xtrabackup is installed properly - aborting."
+			
+      [ -f "$XTRABACKUP" ] || die "xtrabackup executable not found - this is required in order to restore from incrementals. Ensure xtrabackup is installed properly - aborting."
+
+      XTRABACKUP_COMMAND="$(which nice) -n 15 $IONICE_COMMAND $XTRABACKUP"
 		
 			FULL_BACKUP=$(cat $BACKUP/backup.chain | head -1)
 		
@@ -160,17 +163,17 @@ elif [ "$1" = "restore" ]; then
 			echo -e "...done.\n"
 
 			echo "Preparing the base backup in the destination..."
-			$XTRABACKUP --prepare --apply-log-only --target-dir=$DESTINATION &> $LOG_FILE || fail
+			$XTRABACKUP_COMMAND --prepare --apply-log-only --target-dir=$DESTINATION &> $LOG_FILE || fail
 			echo -e "...done.\n"
 		
 			for INCREMENTAL in $(cat $BACKUP/backup.chain | tail -n +2); do
 				echo -e "Applying incremental from $INCREMENTAL...\n"
-				$XTRABACKUP  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &> $LOG_FILE || fail
+				$XTRABACKUP_COMMAND  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &> $LOG_FILE || fail
 				echo -e "...done.\n"
 			done
 
 			echo "Finalising the destination..."
-			$XTRABACKUP --prepare --target-dir=$DESTINATION  &> $LOG_FILE || fail
+			$XTRABACKUP_COMMAND --prepare --target-dir=$DESTINATION  &> $LOG_FILE || fail
 			echo -e "...done.\n"
 		fi
 		
@@ -195,7 +198,7 @@ if [[ $BACKUP_CHAINS -gt $MAX_BACKUP_CHAINS ]]; then
 	
 	for FULL_BACKUP in `ls $FULLS_DIRECTORY -t |  tail -n $CHAINS_TO_DELETE`; do
 		grep -l $FULLS_DIRECTORY/$FULL_BACKUP $INCREMENTALS_DIRECTORY/**/backup.chain | while read incremental; do rm -rf "${incremental%/backup.chain}"; done
-		rm -rf $FULLS_DIRECTORY/$FULL_BACKUP
+		$IONICE_COMMAND rm -rf $FULLS_DIRECTORY/$FULL_BACKUP
 	done
 fi
 

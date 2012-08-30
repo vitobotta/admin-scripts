@@ -7,7 +7,7 @@
 
 set -e
 
-DB_NODES=(db1)
+DB_NODES=(db1 db2 db3)
 
 die () {
 	echo -e 1>&2 "$@"
@@ -63,8 +63,8 @@ ssh $DB_NODE  <<\EOF
 
   [ -f $ARCHIVE ] && rm $ARCHIVE
 
-  tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
-  rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
+  /usr/bin/ionice -c2 -n7 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
+  /usr/bin/ionice -c2 -n7 rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
 
   echo "Compressed archive created."
 EOF
