@@ -5,8 +5,9 @@
 # with real data.
 # ---------------------------------------------------------------------------------------------
 
+set -e
 
-DB_NODES=(db1 db2 db3)
+DB_NODES=(db1)
 
 die () {
 	echo -e 1>&2 "$@"
@@ -35,6 +36,8 @@ DB_NODE="${DB_NODES[0]}"
 echo "*** Using node: $DB_NODE ***"
 
 ssh $DB_NODE  <<\EOF
+  set -e
+
   LOG_FILE="/tmp/production-data-restore-$(date +%Y-%m-%d-%H.%M.%S).log"
   echo "" > $LOG_FILE
 
@@ -47,20 +50,14 @@ ssh $DB_NODE  <<\EOF
     die "...FAILED! See $LOG_FILE for details - aborting.\n"
   }
 
-  echo "Preparing copy of the latest full backup..."
+  echo "Preparing copy of the latest backup available on $DB_NODE..."
 
-  LATEST_FULL_BACKUP=`find /backup/mysql/full/ -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1`
+  LAST_BACKUP_TIMESTAMP=`find /backup/mysql/ -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev`
   TEMP_DIRECTORY=`mktemp -d`
 
-  rsync --quiet --delete -zarv $LATEST_FULL_BACKUP/ $TEMP_DIRECTORY/ &> $LOG_FILE || fail
+  /admin-scripts/backup/xtrabackup.sh restore $LAST_BACKUP_TIMESTAMP $TEMP_DIRECTORY
 
-  echo "Prepared a copy of the data."
-  echo "Finalising the copy for use with MySQL server..."
-
-  innobackupex-1.5.1 --apply-log --ibbackup=xtrabackup_51 $TEMP_DIRECTORY/ &> $LOG_FILE || fail
-
-  echo "Copy of the data finalised for use with MySQL server."
-  echo "Creating a compressed archive..."
+  echo "Prepared a copy of the data, now creating a compressed archive..."
 
   ARCHIVE="/tmp/production-data.tgz"
 
