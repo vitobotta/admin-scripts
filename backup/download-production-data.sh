@@ -7,7 +7,7 @@
 
 set -e
 
-DB_NODES=(db1 db2 db3)
+DB_NODES=(db1 db3)
 
 die () {
 	echo -e 1>&2 "$@"
@@ -35,7 +35,7 @@ DB_NODE="${DB_NODES[0]}"
 
 echo "*** Using node: $DB_NODE ***"
 
-ssh $DB_NODE  <<\EOF
+ssh -T $DB_NODE  <<\EOF
   set -e
 
   LOG_FILE="/tmp/production-data-restore-$(date +%Y-%m-%d-%H.%M.%S).log"
