@@ -38,4 +38,8 @@ echo "Prepared a copy of the data, now creating a compressed archive..."
 
 echo "Compressed archive created."
 
+echo "Deleting archives older than 7 days..."
+find $DESTINATION  -type f -mtime +7 -exec rm {} \;
+echo "..done."
+
 
