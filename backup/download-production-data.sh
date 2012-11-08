@@ -54,7 +54,7 @@ ssh -T $DB_NODE <<\EOF
     die "...FAILED! See $LOG_FILE for details - aborting.\n"
   }
 
-  echo "Preparing copy of the latest backup available on $DB_NODE..."
+  echo "Preparing copy of the latest backup available on $HOSTNAME..."
 
   LAST_BACKUP_TIMESTAMP=`find /backup/mysql/ -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev`
   TEMP_DIRECTORY=`mktemp -d`
