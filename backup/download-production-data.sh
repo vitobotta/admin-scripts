@@ -29,24 +29,34 @@ shuffle() {
    done
 }
 
-shuffle
+if [ "$1" = "skip-download" ]; then
+  ARCHIVE=`find ~/production-data.* -type f -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev`
 
-DB_NODE="${DB_NODES[0]}"
+  echo "Restoring MySQL datadir from $ARCHIVE..."
+else
+  shuffle
 
-echo "*** Using node: $DB_NODE ***"
+  DB_NODE="${DB_NODES[0]}"
 
-ARCHIVE=`ssh -T $DB_NODE "find /backup/mysql/archives/ -type f -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev"`
+  echo "*** Using node: $DB_NODE ***"
 
-echo "Downloading latest archive available on $DB_NODE..."
+  ARCHIVE=`ssh -T $DB_NODE "find /backup/mysql/archives/ -type f -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev"`
 
-scp $DB_NODE:"/backup/mysql/archives/$ARCHIVE" $HOME/
 
-echo <<\EOF
+  echo "Downloading latest archive available on $DB_NODE..."
+
+  scp $DB_NODE:"/backup/mysql/archives/$ARCHIVE" $HOME/
+
+  echo <<\EOF
   ...done. A copy of the archive as downloaded from the server is available as $HOME/$ARCHIVE.
   Should this restore fails, you can still use that archive manually without having to download the same archive again.
 
   Replacing the current MySQL datadir with the new one (if this fails, it may mean MySQL isn't running)...
 EOF
+
+fi
+
+echo "Please enter your current root password (in MySQL)..."
 
 MYSQL_DATA_DIR=`mysql -uroot -p$MYSQL_PWD -Ns -e "show variables like 'datadir'" | cut -f 2`
 
