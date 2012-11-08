@@ -31,7 +31,7 @@ mkdir -vp $DESTINATION
 
 /admin-scripts/backup/xtrabackup.sh restore $LAST_BACKUP_TIMESTAMP $TEMP_DIRECTORY
 
-echo "Prepared a copy of the data, now creating a compressed archive..."
+echo "Prepared a copy of the data, now creating compressed archive $ARCHIVE..."
 
 /usr/bin/ionice -c2 -n7 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
 /usr/bin/ionice -c2 -n7 rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
