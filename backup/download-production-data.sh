@@ -7,11 +7,11 @@
 
 set -e
 
-DB_NODES=(db1 db3)
+DB_NODES=(db1 db2 db3)
 
 die () {
-	echo -e 1>&2 "$@"
-	exit 1
+  echo -e 1>&2 "$@"
+  exit 1
 }
 
 shuffle() {
@@ -34,6 +34,8 @@ shuffle
 DB_NODE="${DB_NODES[0]}"
 
 echo "*** Using node: $DB_NODE ***"
+
+ARCHIVE="/tmp/production-data.$(date +%Y-%m-%d-%H.%M.%S).tgz"
 
 ssh -T $DB_NODE  <<\EOF
   set -e
@@ -59,9 +61,9 @@ ssh -T $DB_NODE  <<\EOF
 
   echo "Prepared a copy of the data, now creating a compressed archive..."
 
-  ARCHIVE="/tmp/production-data.tgz"
+  ARCHIVE="#{ ARCHIVE } "
 
-  [ -f $ARCHIVE ] && rm $ARCHIVE
+  #[ -f $ARCHIVE ] && rm $ARCHIVE
 
   /usr/bin/ionice -c2 -n7 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
   /usr/bin/ionice -c2 -n7 rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
@@ -72,11 +74,7 @@ EOF
 
 echo "Downloading..."
 
-ARCHIVE="/tmp/production-data.tgz"
-
-[ -f $ARCHIVE ] && rm $ARCHIVE
-
-scp $DB_NODE:$ARCHIVE /tmp/
+scp $DB_NODE:$ARCHIVE $HOME/
 
 echo "...done."
 
@@ -112,5 +110,4 @@ fi
   [[ `uname -s` = "Linux" ]] && chown -R mysql:mysql .
   
   $MYSQL_START_COMMAND
-
 )
