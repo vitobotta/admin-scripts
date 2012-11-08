@@ -35,49 +35,14 @@ DB_NODE="${DB_NODES[0]}"
 
 echo "*** Using node: $DB_NODE ***"
 
-ARCHIVE="production-data.$(date +%Y-%m-%d-%H.%M.%S).tgz"
+ARCHIVE=`ssh -T $DB_NODE "find /backup/mysql/archives/ -type f -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev"`
 
-ssh -T $DB_NODE "echo $ARCHIVE > /tmp/production-data-archive-name"
+echo "Downloading latest archive available on $DB_NODE..."
 
-ssh -T $DB_NODE <<\EOF
-  set -e
-
-  LOG_FILE="/tmp/production-data-restore-$(date +%Y-%m-%d-%H.%M.%S).log"
-  echo "" > $LOG_FILE
-
-  die () {
-    echo -e 1>&2 "$@"
-    exit 1
-  }
-
-  fail () {
-    die "...FAILED! See $LOG_FILE for details - aborting.\n"
-  }
-
-  echo "Preparing copy of the latest backup available on $HOSTNAME..."
-
-  LAST_BACKUP_TIMESTAMP=`find /backup/mysql/ -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev`
-  TEMP_DIRECTORY=`mktemp -d`
-
-  /admin-scripts/backup/xtrabackup.sh restore $LAST_BACKUP_TIMESTAMP $TEMP_DIRECTORY
-
-  echo "Prepared a copy of the data, now creating a compressed archive..."
-
-  ARCHIVE="/tmp/`cat /tmp/production-data-archive-name`"
-
-  /usr/bin/ionice -c2 -n7 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
-  /usr/bin/ionice -c2 -n7 rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
-
-  echo "Compressed archive created."
-EOF
-
-
-echo "Downloading..."
-
-scp $DB_NODE:"/tmp/$ARCHIVE" $HOME/
+scp $DB_NODE:"/backup/mysql/archives/$ARCHIVE" $HOME/
 
 echo <<\EOF
-  ...done. A copy of the archive as downloaded from the server is available as $ARCHIVE.
+  ...done. A copy of the archive as downloaded from the server is available as $HOME/$ARCHIVE.
   Should this restore fails, you can still use that archive manually without having to download the same archive again.
 
   Replacing the current MySQL datadir with the new one (if this fails, it may mean MySQL isn't running)...
