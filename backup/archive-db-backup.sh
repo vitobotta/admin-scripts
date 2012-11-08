@@ -20,7 +20,7 @@ fail () {
 }
 
 
-echo "Preparing copy of the latest backup available on $HOSTNAME...
+echo "Preparing copy of the latest backup available on $HOSTNAME..."
 
 LAST_BACKUP_TIMESTAMP=`find /backup/mysql/ -mindepth 2 -maxdepth 2 -type d -exec ls -dt {} \+ | head -1 | rev | cut -d '/' -f 1 | rev`
 DESTINATION="/backup/mysql/archives"
