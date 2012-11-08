@@ -85,15 +85,17 @@ echo "- **" >> $DUPLICITY_INCLUDE_LIST
 
 BACKUP_SETTINGS="--verbosity=$VERBOSITY --allow-source-mismatch --volsize=$MAX_VOLUME_SIZE --exclude-globbing-filelist=$DUPLICITY_INCLUDE_LIST --asynchronous-upload / $BACKUPS_REPOSITORY"
 DUPLICITY="$(which nice) -n 15 $IONICE_COMMAND $DUPLICITY"
+ARGS="$@"
 
 before_backup () {
 	if [ ${#RUN_BEFORE[@]} -gt 0 ]; then
 		echo -e "Running 'before' scripts...\n"
 		for SCRIPT in ${RUN_BEFORE[@]}; do
+      echo "Executing: $SCRIPT $ARGS..."
 			if [ -f $SCRIPT ]; then
-				$SCRIPT "$@"
+				$SCRIPT $ARGS
 			else
-				echo "WARNING: before script $SCRIPT not found"
+				echo "WARNING: script $SCRIPT not found"
 			fi
 		done
 		echo
@@ -111,10 +113,11 @@ after_backup () {
 	if [ ${#RUN_AFTER[@]} -gt 0 ]; then
 		echo -e "Running 'after' scripts...\n"
 		for SCRIPT in ${RUN_AFTER[@]}; do
+      echo "Executing: $SCRIPT $ARGS..."
 			if [ -f $SCRIPT ]; then
-				$SCRIPT "$@"
+				$SCRIPT $ARGS
 			else
-				echo "WARNING: before script $SCRIPT not found"
+				echo "WARNING: script $SCRIPT not found"
 			fi
 		done
 		echo
