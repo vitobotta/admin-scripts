@@ -141,11 +141,11 @@ elif [ "$1" = "restore" ]; then
 			echo "- Restore of full backup taken on $BACKUP_TIMESTAMP"
 
 			echo "Copying data files to destination..."
-			$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION &> $LOG_FILE || fail
+			$RSYNC_COMMAND --quiet -ah --delete $BACKUP/ $DESTINATION &>> $LOG_FILE || fail
 			echo -e "...done.\n"
 		
 			echo "Preparing the destination for use with MySQL..."
-			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION  &> $LOG_FILE || fail
+			$INNOBACKUPEX_COMMAND --apply-log --ibbackup=xtrabackup_51 $DESTINATION  &>> $LOG_FILE || fail
 			echo -e "...done.\n"
 		else
 			XTRABACKUP=$(which xtrabackup)
@@ -159,21 +159,24 @@ elif [ "$1" = "restore" ]; then
 			echo "- Restore of base backup from $FULL_BACKUP"
 
 			echo "Copying data files to destination..."
-			$RSYNC_COMMAND --quiet -ah --delete $FULL_BACKUP/ $DESTINATION  &> $LOG_FILE || fail
+			$RSYNC_COMMAND --quiet -ah --delete $FULL_BACKUP/ $DESTINATION  &>> $LOG_FILE || fail
 			echo -e "...done.\n"
 
 			echo "Preparing the base backup in the destination..."
-			$XTRABACKUP_COMMAND --prepare --apply-log-only --target-dir=$DESTINATION &> $LOG_FILE || fail
+			#$XTRABACKUP_COMMAND --prepare --apply-log-only --target-dir=$DESTINATION &>> $LOG_FILE || fail
+      $INNOBACKUPEX_COMMAND --apply-log --redo-only $DESTINATION &>> $LOG_FILE || fail
 			echo -e "...done.\n"
 		
 			for INCREMENTAL in $(cat $BACKUP/backup.chain | tail -n +2); do
 				echo -e "Applying incremental from $INCREMENTAL...\n"
-				$XTRABACKUP_COMMAND  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &> $LOG_FILE || fail
+				#$XTRABACKUP_COMMAND  --prepare --apply-log-only --target-dir=$DESTINATION --incremental-dir=$INCREMENTAL  &>> $LOG_FILE || fail
+        $INNOBACKUPEX_COMMAND --apply-log --redo-only $DESTINATION --incremental-dir=$INCREMENTAL &>> $LOG_FILE || fail
 				echo -e "...done.\n"
 			done
 
 			echo "Finalising the destination..."
-			$XTRABACKUP_COMMAND --prepare --target-dir=$DESTINATION  &> $LOG_FILE || fail
+			#$XTRABACKUP_COMMAND --prepare --target-dir=$DESTINATION  &>> $LOG_FILE || fail
+      $INNOBACKUPEX_COMMAND --apply-log  $DESTINATION &>> $LOG_FILE || fail
 			echo -e "...done.\n"
 		fi
 		
