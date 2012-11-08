@@ -7,11 +7,11 @@
 
 set -e
 
-DB_NODES=(db1 db3)
+DB_NODES=(db1 db2 db3)
 
 die () {
-	echo -e 1>&2 "$@"
-	exit 1
+  echo -e 1>&2 "$@"
+  exit 1
 }
 
 shuffle() {
@@ -35,7 +35,11 @@ DB_NODE="${DB_NODES[0]}"
 
 echo "*** Using node: $DB_NODE ***"
 
-ssh -T $DB_NODE  <<\EOF
+ARCHIVE="production-data.$(date +%Y-%m-%d-%H.%M.%S).tgz"
+
+ssh -T $DB_NODE "echo $ARCHIVE > /tmp/production-data-archive-name"
+
+ssh -T $DB_NODE <<\EOF
   set -e
 
   LOG_FILE="/tmp/production-data-restore-$(date +%Y-%m-%d-%H.%M.%S).log"
@@ -59,9 +63,7 @@ ssh -T $DB_NODE  <<\EOF
 
   echo "Prepared a copy of the data, now creating a compressed archive..."
 
-  ARCHIVE="/tmp/production-data.tgz"
-
-  [ -f $ARCHIVE ] && rm $ARCHIVE
+  ARCHIVE="/tmp/`cat /tmp/production-data-archive-name`"
 
   /usr/bin/ionice -c2 -n7 tar cvfz $ARCHIVE $TEMP_DIRECTORY &> $LOG_FILE || fail
   /usr/bin/ionice -c2 -n7 rm -rf $TEMP_DIRECTORY &> $LOG_FILE || fail
@@ -72,15 +74,14 @@ EOF
 
 echo "Downloading..."
 
-ARCHIVE="/tmp/production-data.tgz"
+scp $DB_NODE:"/tmp/$ARCHIVE" $HOME/
 
-[ -f $ARCHIVE ] && rm $ARCHIVE
+echo <<\EOF
+  ...done. A copy of the archive as downloaded from the server is available as $ARCHIVE.
+  Should this restore fails, you can still use that archive manually without having to download the same archive again.
 
-scp $DB_NODE:$ARCHIVE /tmp/
-
-echo "...done."
-
-echo "Replacing the current datadir with the new one..."
+  Replacing the current MySQL datadir with the new one (if this fails, it may mean MySQL isn't running)...
+EOF
 
 MYSQL_DATA_DIR=`mysql -uroot -p$MYSQL_PWD -Ns -e "show variables like 'datadir'" | cut -f 2`
 
@@ -105,12 +106,11 @@ fi
   
   mkdir $MYSQL_DATA_DIR && cd $MYSQL_DATA_DIR 
   
-  tar xvfz $ARCHIVE 
+  tar xvfz $HOME/$ARCHIVE 
   
   mv tmp/tmp*/* . 
 
   [[ `uname -s` = "Linux" ]] && chown -R mysql:mysql .
   
   $MYSQL_START_COMMAND
-
 )
