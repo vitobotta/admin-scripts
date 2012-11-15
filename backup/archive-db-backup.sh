@@ -42,8 +42,8 @@ mv $TEMPFILE $ARCHIVE
 
 echo "Compressed archive created."
 
-echo "Deleting archives older than 7 days..."
-find $DESTINATION  -type f -mtime +7 -exec rm {} \;
+echo "Deleting archives older than 3 days..."
+find $DESTINATION  -type f -mtime +3 -exec rm {} \;
 echo "..done."
 
 
