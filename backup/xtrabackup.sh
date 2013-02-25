@@ -11,8 +11,11 @@ fail () {
 
 INNOBACKUPEX=$(which innobackupex)
 [ -f "$INNOBACKUPEX" ] || die "innobackupex script not found - please ensure xtrabackup is installed before proceeding."
-
-CONFIG_FILE=$HOME/.xtrabackup.config
+if [ -n "$2" ]; then 
+	CONFIG_FILE="${2}"
+else
+	CONFIG_FILE=$HOME/.xtrabackup.config
+fi
 
 if [ -f $CONFIG_FILE ]; then
 	echo -e "Loading configuration from $CONFIG_FILE."
