@@ -25,6 +25,7 @@ MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
 MYSQL_DATA_DIR=/var/lib/mysql/
 BACKUPS_DIRECTORY=$HOME/mysql-backups
 MAX_BACKUP_CHAINS=8
+DEFAULTS_GROUP=     
 EOF
 
 	die "Configuration has been initialised in $CONFIG_FILE. \nPlease make sure all settings are correctly defined/customised - aborting."
@@ -32,6 +33,7 @@ fi
 
 [ -d $MYSQL_DATA_DIR ] || die "Please ensure the MYSQL_DATA_DIR setting in the configuration file points to the directory containing the MySQL databases."
 [ -n "$MYSQL_USER" -a -n "$MYSQL_PASS" ] || die "Please ensure MySQL username and password are properly set in the configuration file."
+[ -n ${DEFAULTS_GROUP} ] || DEFAULTS_GROUP="--defaults-group=$DEFAULTS_GROUP"
 
 FULLS_DIRECTORY=$BACKUPS_DIRECTORY/full
 INCREMENTALS_DIRECTORY=$BACKUPS_DIRECTORY/incr
@@ -52,7 +54,7 @@ INNOBACKUPEX_COMMAND="$(which nice) -n 15 $IONICE_COMMAND $INNOBACKUPEX"
 RSYNC_COMMAND="$(which nice) -n 15 $IONICE_COMMAND  $(which rsync)"
 
 full_backup () {
-	$INNOBACKUPEX_COMMAND --slave-info --socket=${MYSQL_SOCKET} --user="$MYSQL_USER" --password="$MYSQL_PASS" "$FULLS_DIRECTORY"
+	$INNOBACKUPEX_COMMAND --slave-info --socket=${MYSQL_SOCKET} --user="$MYSQL_USER" --password="$MYSQL_PASS" $DEFAULTS_GROUP "$FULLS_DIRECTORY"
 
 	NEW_BACKUP_DIR=$(find $FULLS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 
@@ -62,7 +64,7 @@ full_backup () {
 incremental_backup () {
 	LAST_BACKUP=${LAST_CHECKPOINTS%/xtrabackup_checkpoints}
 
-	$INNOBACKUPEX_COMMAND --slave-info --socket=${MYSQL_SOCKET} --user="$MYSQL_USER" --password="$MYSQL_PASS" --incremental --incremental-basedir="$LAST_BACKUP" "$INCREMENTALS_DIRECTORY"
+	$INNOBACKUPEX_COMMAND --slave-info --socket=${MYSQL_SOCKET} --user="$MYSQL_USER" --password="$MYSQL_PASS" --incremental --incremental-basedir="$LAST_BACKUP" $DEFAULTS_GROUP "$INCREMENTALS_DIRECTORY"
 
 	NEW_BACKUP_DIR=$(find $INCREMENTALS_DIRECTORY -mindepth 1 -maxdepth 1 -type d -exec ls -dt {} \+ | head -1)
 	cp $LAST_BACKUP/backup.chain $NEW_BACKUP_DIR/
