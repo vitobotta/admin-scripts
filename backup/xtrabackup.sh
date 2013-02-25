@@ -33,7 +33,7 @@ fi
 
 [ -d $MYSQL_DATA_DIR ] || die "Please ensure the MYSQL_DATA_DIR setting in the configuration file points to the directory containing the MySQL databases."
 [ -n "$MYSQL_USER" -a -n "$MYSQL_PASS" ] || die "Please ensure MySQL username and password are properly set in the configuration file."
-if [ -n ${DEFAULTS_GROUP} ];then  DEFAULTS_GROUP="--defaults-group=${DEFAULTS_GROUP}"; fi
+if [ -n "${DEFAULTS_GROUP}" ]; then  DEFAULTS_GROUP="--defaults-group=${DEFAULTS_GROUP}"; fi
 
 FULLS_DIRECTORY=$BACKUPS_DIRECTORY/full
 INCREMENTALS_DIRECTORY=$BACKUPS_DIRECTORY/incr
