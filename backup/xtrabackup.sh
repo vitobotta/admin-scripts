@@ -191,7 +191,7 @@ elif [ "$1" = "restore" ]; then
 		die "Backup not found. To see the list of the available backups, run: $0 list"
 	fi
 else
-  die "Backup type not specified. Please run: as $0 [incr|full]"
+  die "Backup type not specified. Please run: as $0 [incr|full|list|restore]"
 fi
 
 BACKUP_CHAINS=`ls $FULLS_DIRECTORY | wc -l`
